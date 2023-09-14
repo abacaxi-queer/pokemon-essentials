@@ -102,8 +102,8 @@ end
 #
 #===============================================================================
 class PokemonSummary_Scene
-  MARK_WIDTH  = 16
-  MARK_HEIGHT = 16
+  MARK_WIDTH  = 19
+  MARK_HEIGHT = 19
   # Colors used for messages in this scene
   RED_TEXT_BASE     = Color.new(248, 56, 32)
   RED_TEXT_SHADOW   = Color.new(224, 152, 144)
@@ -136,7 +136,7 @@ class PokemonSummary_Scene
     @sprites["pokeicon"].x       = 46
     @sprites["pokeicon"].y       = 92
     @sprites["pokeicon"].visible = false
-    @sprites["itemicon"] = ItemIconSprite.new(30, 320, @pokemon.item_id, @viewport)
+    @sprites["itemicon"] = ItemIconSprite.new(48, 418, @pokemon.item_id, @viewport)
     @sprites["itemicon"].blankzero = true
     @sprites["overlay"] = BitmapSprite.new(Graphics.width, Graphics.height, @viewport)
     pbSetSystemFont(@sprites["overlay"].bitmap)
@@ -180,7 +180,7 @@ class PokemonSummary_Scene
     drawPage(@page)
     pbFadeInAndShow(@sprites) { pbUpdate }
   end
-
+  
   def pbStartForgetScene(party, partyindex, move_to_learn)
     @viewport = Viewport.new(0, 0, Graphics.width, Graphics.height)
     @viewport.z = 99999
@@ -301,81 +301,141 @@ class PokemonSummary_Scene
   end
 
   def drawPage(page)
-    if @pokemon.egg?
-      drawPageOneEgg
-      return
-    end
-    @sprites["pokemon"].setPokemonBitmap(@pokemon)
-    @sprites["pokeicon"].pokemon = @pokemon
-    @sprites["itemicon"].item = @pokemon.item_id
-    overlay = @sprites["overlay"].bitmap
-    overlay.clear
-    base   = Color.new(248, 248, 248)
-    shadow = Color.new(104, 104, 104)
-    # Set background image
-    @sprites["background"].setBitmap("Graphics/UI/Summary/bg_#{page}")
-    imagepos = []
-    # Show the Poké Ball containing the Pokémon
-    ballimage = sprintf("Graphics/UI/Summary/icon_ball_%s", @pokemon.poke_ball)
-    imagepos.push([ballimage, 14, 60])
-    # Show status/fainted/Pokérus infected icon
-    status = -1
-    if @pokemon.fainted?
-      status = GameData::Status.count - 1
-    elsif @pokemon.status != :NONE
-      status = GameData::Status.get(@pokemon.status).icon_position
-    elsif @pokemon.pokerusStage == 1
-      status = GameData::Status.count
-    end
-    if status >= 0
-      imagepos.push([_INTL("Graphics/UI/statuses"), 124, 100, 0, 16 * status, 44, 16])
-    end
-    # Show Pokérus cured icon
-    if @pokemon.pokerusStage == 2
-      imagepos.push(["Graphics/UI/Summary/icon_pokerus", 176, 100])
-    end
-    # Show shininess star
-    imagepos.push(["Graphics/UI/shiny", 2, 134]) if @pokemon.shiny?
-    # Draw all images
-    pbDrawImagePositions(overlay, imagepos)
-    # Write various bits of text
-    pagename = [_INTL("INFO"),
+    if PluginManager.installed?("Modular UI Scenes")      
+      setPages # Gets the list of pages and current page ID.
+		  suffix = UIHandlers.get_info(:summary, @page_id, :suffix)
+		  @sprites["background"].setBitmap("Graphics/UI/Summary/bg_#{suffix}")
+		  @sprites["pokemon"].setPokemonBitmap(@pokemon)
+		  @sprites["pokeicon"].pokemon = @pokemon
+		  @sprites["itemicon"].item = @pokemon.item_id
+		  overlay = @sprites["overlay"].bitmap
+		  overlay.clear
+		  base   = Color.new(248, 248, 248)
+		  shadow = Color.new(104, 104, 104)
+		  drawPageIcons # Draws the page icons.
+		  imagepos = []
+		  # Draws general page info.
+		  ballimage = sprintf("Graphics/UI/Summary/icon_ball_%s", @pokemon.poke_ball)
+		  imagepos.push([ballimage, 14, 60])
+		  pagename = UIHandlers.get_info(:summary, @page_id, :name)
+		  textpos = [
+		    [pagename, 26, 22, :left, base, shadow],
+		    [@pokemon.name, 46, 68, :left, base, shadow],
+		    [_INTL("Item"), 16, 344, :left, base, shadow]
+		  ]
+		  if @pokemon.hasItem?
+		    textpos.push([@pokemon.item.name, 96, 358+54, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+		  else
+		    textpos.push([_INTL("None"), 96, 358+54, :left, Color.new(192, 200, 208), Color.new(208, 216, 224)])
+		  end
+		  # Draws additional info for non-Egg Pokemon.
+		  if !@pokemon.egg?
+		    status = -1
+		    if @pokemon.fainted?
+			    status = GameData::Status.count - 1
+		    elsif @pokemon.status != :NONE
+			    status = GameData::Status.get(@pokemon.status).icon_position
+		    elsif @pokemon.pokerusStage == 1
+			    status = GameData::Status.count
+		    end
+		    if status >= 0
+			    imagepos.push(["Graphics/UI/statuses", 124, 100, 0, 16 * status, 44, 16])
+		    end
+		    if @pokemon.pokerusStage == 2
+			    imagepos.push(["Graphics/UI/Summary/icon_pokerus", 176, 100])
+		    end
+		    imagepos.push(["Graphics/UI/shiny", 218, 338]) if @pokemon.shiny?
+		    textpos.push([@pokemon.level.to_s, 46, 98, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+		    if @pokemon.male?
+			    textpos.push([_INTL("♂"), 178, 68, :left, Color.new(24, 112, 216), Color.new(136, 168, 208)])
+		    elsif @pokemon.female?
+			    textpos.push([_INTL("♀"), 178, 68, :left, Color.new(248, 56, 32), Color.new(224, 152, 144)])
+		    end
+		  end
+		  # Draws the page.
+		  pbDrawImagePositions(overlay, imagepos)
+		  pbDrawTextPositions(overlay, textpos)
+		  UIHandlers.call(:summary, @page_id, "layout", @pokemon, self)
+		  drawMarkings(overlay, 104, 339)
+      
+    else  # plugin not installed, haven't changed the x/y positions here
+      if @pokemon.egg?
+        drawPageOneEgg
+        return
+      end
+      @sprites["pokemon"].setPokemonBitmap(@pokemon)
+      @sprites["pokeicon"].pokemon = @pokemon
+      @sprites["itemicon"].item = @pokemon.item_id
+      overlay = @sprites["overlay"].bitmap
+      overlay.clear
+      base   = Color.new(248, 248, 248)
+      shadow = Color.new(104, 104, 104)
+      # Set background image
+      @sprites["background"].setBitmap("Graphics/UI/Summary/bg_#{page}")
+      imagepos = []
+      # Show the Poké Ball containing the Pokémon
+      ballimage = sprintf("Graphics/UI/Summary/icon_ball_%s", @pokemon.poke_ball)
+      imagepos.push([ballimage, 14, 60])
+      # Show status/fainted/Pokérus infected icon
+      status = -1
+      if @pokemon.fainted?
+        status = GameData::Status.count - 1
+      elsif @pokemon.status != :NONE
+        status = GameData::Status.get(@pokemon.status).icon_position
+      elsif @pokemon.pokerusStage == 1
+        status = GameData::Status.count
+      end
+      if status >= 0
+        imagepos.push([_INTL("Graphics/UI/statuses"), 124, 100, 0, 16 * status, 44, 16])
+      end
+      # Show Pokérus cured icon
+      if @pokemon.pokerusStage == 2
+        imagepos.push(["Graphics/UI/Summary/icon_pokerus", 176, 100])
+      end
+      # Show shininess star
+      imagepos.push(["Graphics/UI/shiny", 2, 134]) if @pokemon.shiny?
+      # Draw all images
+      pbDrawImagePositions(overlay, imagepos)
+      # Write various bits of text
+      pagename = [_INTL("INFO"),
                 _INTL("TRAINER MEMO"),
                 _INTL("SKILLS"),
                 _INTL("MOVES"),
                 _INTL("RIBBONS")][page - 1]
-    textpos = [
-      [pagename, 26, 22, :left, base, shadow],
-      [@pokemon.name, 46, 68, :left, base, shadow],
-      [@pokemon.level.to_s, 46, 98, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)],
-      [_INTL("Item"), 66, 324, :left, base, shadow]
-    ]
-    # Write the held item's name
-    if @pokemon.hasItem?
-      textpos.push([@pokemon.item.name, 16, 358, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)])
-    else
-      textpos.push([_INTL("None"), 16, 358, :left, Color.new(192, 200, 208), Color.new(208, 216, 224)])
-    end
-    # Write the gender symbol
-    if @pokemon.male?
-      textpos.push([_INTL("♂"), 178, 68, :left, Color.new(24, 112, 216), Color.new(136, 168, 208)])
-    elsif @pokemon.female?
-      textpos.push([_INTL("♀"), 178, 68, :left, Color.new(248, 56, 32), Color.new(224, 152, 144)])
-    end
-    # Draw all text
-    pbDrawTextPositions(overlay, textpos)
-    # Draw the Pokémon's markings
-    drawMarkings(overlay, 84, 292)
-    # Draw page-specific information
-    case page
-    when 1 then drawPageOne
-    when 2 then drawPageTwo
-    when 3 then drawPageThree
-    when 4 then drawPageFour
-    when 5 then drawPageFive
-    end
+      textpos = [
+        [pagename, 26, 22, :left, base, shadow],
+        [@pokemon.name, 46, 68, :left, base, shadow],
+        [@pokemon.level.to_s, 46, 98, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)],
+        [_INTL("Item"), 66, 324, :left, base, shadow]
+      ]
+      # Write the held item's name
+      if @pokemon.hasItem?
+        textpos.push([@pokemon.item.name, 16, 358, :left, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+      else
+        textpos.push([_INTL("None"), 16, 358, :left, Color.new(192, 200, 208), Color.new(208, 216, 224)])
+      end
+      # Write the gender symbol
+      if @pokemon.male?
+        textpos.push([_INTL("♂"), 178, 68, :left, Color.new(24, 112, 216), Color.new(136, 168, 208)])
+      elsif @pokemon.female?
+        textpos.push([_INTL("♀"), 178, 68, :left, Color.new(248, 56, 32), Color.new(224, 152, 144)])
+      end
+      # Draw all text
+      pbDrawTextPositions(overlay, textpos)
+      # Draw the Pokémon's markings
+      drawMarkings(overlay, 84, 292)
+      # Draw page-specific information
+      case page
+        when 1 then drawPageOne
+        when 2 then drawPageTwo
+        when 3 then drawPageThree
+        when 4 then drawPageFour
+        when 5 then drawPageFive
+      end
+    end 
   end
 
+  # SUMMARY
   def drawPageOne
     overlay = @sprites["overlay"].bitmap
     base   = Color.new(248, 248, 248)
@@ -392,13 +452,19 @@ class PokemonSummary_Scene
       pbDrawImagePositions(overlay, imagepos)
     end
     # Write various bits of text
+    textpos_x = 304
+	  species_y = 126
+	  type_y = 166
+	  ot_y = 206
+	  id_y = 246
+	  textpos2_x = 600
     textpos = [
-      [_INTL("Dex No."), 238, 86, :left, base, shadow],
-      [_INTL("Species"), 238, 118, :left, base, shadow],
-      [@pokemon.speciesName, 435, 118, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)],
-      [_INTL("Type"), 238, 150, :left, base, shadow],
-      [_INTL("OT"), 238, 182, :left, base, shadow],
-      [_INTL("ID No."), 238, 214, :left, base, shadow]
+      [_INTL("Dex No."), textpos_x, 86, :left, base, shadow],
+      [_INTL("Species"), textpos_x, species_y, :left, base, shadow],
+      [@pokemon.speciesName, textpos_x+197, species_y, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)],
+      [_INTL("Type"), textpos_x, type_y, :left, base, shadow],
+      [_INTL("OT"), textpos_x, ot_y, :left, base, shadow],
+      [_INTL("ID No."), textpos_x, id_y, :left, base, shadow]
     ]
     # Write the Regional/National Dex number
     dexnum = 0
@@ -417,15 +483,15 @@ class PokemonSummary_Scene
       end
     end
     if dexnum <= 0
-      textpos.push(["???", 435, 86, :center, dexNumBase, dexNumShadow])
+      textpos.push(["???", textpos2_x, 86, :center, dexNumBase, dexNumShadow])
     else
       dexnum -= 1 if dexnumshift
-      textpos.push([sprintf("%03d", dexnum), 435, 86, :center, dexNumBase, dexNumShadow])
+      textpos.push([sprintf("%03d", dexnum), textpos2_x, 86, :center, dexNumBase, dexNumShadow])
     end
     # Write Original Trainer's name and ID number
     if @pokemon.owner.name.empty?
-      textpos.push([_INTL("RENTAL"), 435, 182, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)])
-      textpos.push(["?????", 435, 214, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+      textpos.push([_INTL("RENTAL"), textpos2_x, ot_y, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+      textpos.push(["?????", textpos2_x, 214, :center, Color.new(64, 64, 64), Color.new(176, 176, 176)])
     else
       ownerbase   = Color.new(64, 64, 64)
       ownershadow = Color.new(176, 176, 176)
@@ -437,13 +503,15 @@ class PokemonSummary_Scene
         ownerbase = Color.new(248, 56, 32)
         ownershadow = Color.new(224, 152, 144)
       end
-      textpos.push([@pokemon.owner.name, 435, 182, :center, ownerbase, ownershadow])
-      textpos.push([sprintf("%05d", @pokemon.owner.public_id), 435, 214, :center,
+      textpos.push([@pokemon.owner.name, textpos2_x, ot_y, :center, ownerbase, ownershadow])
+      textpos.push([sprintf("%05d", @pokemon.owner.public_id), textpos2_x, 214, :center,
                     Color.new(64, 64, 64), Color.new(176, 176, 176)])
     end
     # Write Exp text OR heart gauge message (if a Shadow Pokémon)
+    exp_y = 286
+	  nextlvl_y = 326
     if @pokemon.shadowPokemon?
-      textpos.push([_INTL("Heart Gauge"), 238, 246, :left, base, shadow])
+      textpos.push([_INTL("Heart Gauge"), textpos_x, exp_y, :left, base, shadow])
       black_text_tag = shadowc3tag(BLACK_TEXT_BASE, BLACK_TEXT_SHADOW)
       heartmessage = [_INTL("The door to its heart is open! Undo the final lock!"),
                       _INTL("The door to its heart is almost fully open."),
@@ -455,26 +523,27 @@ class PokemonSummary_Scene
       drawFormattedTextEx(overlay, 234, 308, 264, memo)
     else
       endexp = @pokemon.growth_rate.minimum_exp_for_level(@pokemon.level + 1)
-      textpos.push([_INTL("Exp. Points"), 238, 246, :left, base, shadow])
-      textpos.push([@pokemon.exp.to_s_formatted, 488, 278, :right, Color.new(64, 64, 64), Color.new(176, 176, 176)])
-      textpos.push([_INTL("To Next Lv."), 238, 310, :left, base, shadow])
-      textpos.push([(endexp - @pokemon.exp).to_s_formatted, 488, 342, :right, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+      textpos.push([_INTL("Exp. Points"), textpos_x, exp_y, :left, base, shadow])
+      textpos.push([@pokemon.exp.to_s_formatted, textpos2_x, exp_y, :right, Color.new(64, 64, 64), Color.new(176, 176, 176)])
+      textpos.push([_INTL("To Next Lv."), textpos_x, nextlvl_y, :left, base, shadow])
+      textpos.push([(endexp - @pokemon.exp).to_s_formatted, textpos2_x, nextlvl_y, :right, Color.new(64, 64, 64), Color.new(176, 176, 176)])
     end
     # Draw all text
     pbDrawTextPositions(overlay, textpos)
     # Draw Pokémon type(s)
     @pokemon.types.each_with_index do |type, i|
       type_number = GameData::Type.get(type).icon_position
-      type_rect = Rect.new(0, type_number * 28, 64, 28)
-      type_x = (@pokemon.types.length == 1) ? 402 : 370 + (66 * i)
-      overlay.blt(type_x, 146, @typebitmap.bitmap, type_rect)
+      type_rect = Rect.new(0, type_number * 32, 100, 32) # i use bigger icons
+      type_x = (@pokemon.types.length == 1) ? 402 : 370 + (95 * i)
+      overlay.blt(type_x+30, type_y-5, @typebitmap.bitmap, type_rect)
     end
     # Draw Exp bar
     if @pokemon.level < GameData::GrowthRate.max_level
-      w = @pokemon.exp_fraction * 128
+      file_width = 280
+      w = @pokemon.exp_fraction * file_width
       w = ((w / 2).round) * 2
       pbDrawImagePositions(overlay,
-                           [["Graphics/UI/Summary/overlay_exp", 362, 372, 0, 0, w, 6]])
+                           [["Graphics/UI/Summary/overlay_exp", 309, 368, 0, 0, w, 7]])
     end
   end
 
@@ -539,6 +608,7 @@ class PokemonSummary_Scene
     drawMarkings(overlay, 84, 292)
   end
 
+  # TRAINER MEMO
   def drawPageTwo
     overlay = @sprites["overlay"].bitmap
     red_text_tag = shadowc3tag(RED_TEXT_BASE, RED_TEXT_SHADOW)
