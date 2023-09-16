@@ -742,7 +742,7 @@ class PokemonSummary_Scene
     ability = @pokemon.ability
     if ability
       textpos.push([ability.name, 570, 328, :right, Color.new(64, 64, 64), Color.new(176, 176, 176)])
-      drawTextEx(overlay, textpos_x, 366, 330, 3, ability.description, Color.new(64, 64, 64), Color.new(176, 176, 176))
+      drawTextEx(overlay, textpos_x, 366, 320, 3, ability.description, Color.new(64, 64, 64), Color.new(176, 176, 176))
     end
     # Draw all text
     pbDrawTextPositions(overlay, textpos)
@@ -880,8 +880,8 @@ class PokemonSummary_Scene
     @pokemon.types.each_with_index do |type, i|
       type_number = GameData::Type.get(type).icon_position
       type_rect = Rect.new(0, type_number * 32, 100, 32)
-      type_x = (@pokemon.types.length == 1) ? 130 : 96 + (70 * i)
-      overlay.blt(type_x, 78, @typebitmap.bitmap, type_rect)
+      type_y = (@pokemon.types.length == 1) ? 70 : 70 + (32 * i)
+      overlay.blt(140, type_y, @typebitmap.bitmap, type_rect)
     end
   end
 
